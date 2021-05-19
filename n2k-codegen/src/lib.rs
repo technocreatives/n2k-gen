@@ -174,6 +174,7 @@ fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> Toke
     }
 }
 
+/// Generate a PGN enum with all recognised PGN structures
 fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> TokenStream {
     let mut variants = vec![];
     let mut match_arms = vec![];
@@ -227,6 +228,7 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> Token
     }
 }
 
+/// Generate an enum only for parsing the PGN IDs
 fn codegen_pgns_enum(pgns: &PgnsFile) -> TokenStream {
     let mut enum_fields = vec![];
     let mut enum_match_arms = vec![];
@@ -282,6 +284,7 @@ fn codegen_pgns_enum(pgns: &PgnsFile) -> TokenStream {
     }
 }
 
+/// Generate a message structure with getters for the specific PGN
 fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninfo: &PgnInfo) {
     let struct_name = Ident::new(&type_name(&pgninfo.id), Span::call_site());
     let module_name = pgninfo.id.to_snake_case();
@@ -317,6 +320,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
     writeln!(message_file, "{}", struct_).unwrap();
 
     let pgn_id = TokenStream::from_str(&pgninfo.pgn.to_string()).unwrap();
+    // TryFrom impl for generating structure from a byte slice
     let try_from = quote! {
         impl core::convert::TryFrom<&[u8]> for #struct_name {
           type Error = N2kError;
@@ -335,7 +339,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
 
     writeln!(message_file, "{}", try_from).unwrap();
 
-    // Codegen Enums
+    // Codegen enums that are part of this PGN
     for field in &pgninfo.fields.fields {
         if !field.enum_values.enum_values.is_empty() {
             writeln!(
@@ -351,6 +355,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
     writeln!(message_file, "{}", impl_tokens).unwrap();
 }
 
+/// Generate an enum for a lookup table type field
 fn codegen_enum(pgninfo: &PgnInfo, field: &Field, values: &EnumValues) -> TokenStream {
     let enum_int_type = decode_unsigned_int_type_for_bit_length(field.bit_length).0;
     let enum_type_name = lookup_table_type(&field);
@@ -379,7 +384,7 @@ fn codegen_enum(pgninfo: &PgnInfo, field: &Field, values: &EnumValues) -> TokenS
         });
     }
 
-    // TODO: impl Into<>
+    // TODO: impl Into<> for writing
     quote! {
        #[derive(Debug)]
        pub enum #enum_type_name {
@@ -399,6 +404,7 @@ fn codegen_enum(pgninfo: &PgnInfo, field: &Field, values: &EnumValues) -> TokenS
     }
 }
 
+/// Impl body for a PGN
 fn codegen_impl(pgninfo: &PgnInfo) -> TokenStream {
     let struct_name_str = type_name(&pgninfo.id);
     let struct_name = Ident::new(&struct_name_str, Span::call_site());
@@ -428,6 +434,7 @@ fn codegen_impl(pgninfo: &PgnInfo) -> TokenStream {
     }
 }
 
+/// Generate raw and interpreted getters for a PGN
 fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<String>) {
     let mut getters = vec![];
     let mut generated_fields = vec![];
@@ -479,10 +486,22 @@ fn codegen_raw_get_impl(field: &Field, field_name: &Ident) -> TokenStream {
     let bits = quote! {
         self.raw.view_bits::<Lsb0>()[#bit_offset .. #bit_end]
     };
+
+    let mut comments = vec![];
+    if let Some(units) = field.units.as_ref() {
+        comments.push(format!("///Unit: {}", units));
+    }
+    if let Some(description) = field.description.as_ref() {
+        comments.push(format!("///Description: {}", description));
+    }
+
+    let comments = TokenStream::from_str(&comments.join("\n")).unwrap();
+
     if !is_slice {
         if field.signed {
             let signed_type = decode_signed_int_type_for_bit_length(field.bit_length);
             quote! {
+                #comments
                 pub fn #field_name(&self) -> #signed_type {
                     let value = #bits.load_be::<#rust_type_raw>();
                     #signed_type::from_ne_bytes(value.to_ne_bytes())
@@ -490,6 +509,7 @@ fn codegen_raw_get_impl(field: &Field, field_name: &Ident) -> TokenStream {
             }
         } else {
             quote! {
+                #comments
                 pub fn #field_name(&self) -> #rust_type_raw {
                     #bits.load_be::<#rust_type_raw>()
                 }
@@ -497,6 +517,7 @@ fn codegen_raw_get_impl(field: &Field, field_name: &Ident) -> TokenStream {
         }
     } else {
         quote! {
+            #comments
             pub fn #field_name<'a>(&'a self) -> #rust_type_raw {
                 #bits.as_raw_slice()
             }

@@ -86,6 +86,10 @@ pub struct Field {
     pub resolution: f32,
     #[serde(rename = "EnumValues", default)]
     pub enum_values: EnumValues,
+    #[serde(rename = "Units", default)]
+    pub units: Option<String>,
+    #[serde(rename = "Description", default)]
+    pub description: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
