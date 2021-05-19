@@ -15,6 +15,7 @@ quote = "1.0.9"
 proc-macro2 = "1.0.26"
 structopt = "0.3.21"
 serde_json = "1.0.64"
+glob = "0.3.0"
 
 [[bin]]
 name = "cli-tool"

@@ -26,7 +26,11 @@ pub struct N2kCodeGenOpts {
 }
 
 pub fn codegen(opts: N2kCodeGenOpts) {
-    let dest_path = opts.output.join("src");
+    let dest_path = if opts.generate_crate.is_some() {
+        opts.output.join("src")
+    } else {
+        opts.output.to_owned()
+    };
     std::fs::create_dir_all(&dest_path).ok();
 
     let my_str = std::fs::read_to_string(&opts.pgns_xml).unwrap();
@@ -94,12 +98,16 @@ pub fn codegen(opts: N2kCodeGenOpts) {
         .for_each(|info| codegen_pgn(&mut lib_file, &mut gen_lib_file, &dest_path, info));
 
     log::info!("Running rustfmt...");
-    let _ = std::process::Command::new("cargo")
-        .arg("fmt")
-        .current_dir(&opts.output)
+    let rust_files: Vec<_> = glob::glob(&format!("{}/**/*.rs", opts.output.display()))
+        .unwrap()
+        .filter_map(|v| v.ok())
+        .collect();
+    let _ = std::process::Command::new("rustfmt")
+        .args(&rust_files)
         .status()
         .unwrap();
     if opts.generate_crate.is_some() {
+        log::info!("Running cargo check...");
         let _ = std::process::Command::new("cargo")
             .arg("check")
             .current_dir(&opts.output)
@@ -151,8 +159,8 @@ fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> Toke
     quote! {
         pub struct PgnRegistry;
         impl n2k::PgnRegistry for PgnRegistry {
-            type Message = crate::Pgn;
-            type Error = crate::types::N2kError;
+            type Message = super::Pgn;
+            type Error = super::types::N2kError;
 
             // fn is_known(pgn: u32) -> bool;
             fn is_fast_packet(pgn: u32) -> bool {
@@ -160,7 +168,7 @@ fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> Toke
             }
 
             fn build_message(pgn: u32, data: &[u8]) -> Result<Self::Message, Self::Error> {
-                crate::Pgn::try_from_bytes(pgn, data)
+                super::Pgn::try_from_bytes(pgn, data)
             }
         }
     }
@@ -192,15 +200,15 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> Token
 
         let variant_name = Ident::new(&names[0], Span::call_site());
         variants.push(quote! {
-            #variant_name(crate::#variant_name)
+            #variant_name(super::#variant_name)
         });
 
         match_arms.push(quote! {
-            #pgn_id => Pgn::#variant_name(crate::#variant_name::try_from(bytes)?)
+            #pgn_id => Pgn::#variant_name(super::#variant_name::try_from(bytes)?)
         });
     }
     quote! {
-        use crate::types::*;
+        use super::types::*;
         use core::convert::TryFrom;
 
         #[derive(Debug)]
@@ -253,7 +261,7 @@ fn codegen_pgns_enum(pgns: &PgnsFile) -> TokenStream {
 
     quote! {
         #![allow(non_camel_case_types)]
-        use crate::types::*;
+        use super::types::*;
 
         #[derive(Eq, PartialEq, Debug)]
         pub enum Pgns {
@@ -294,7 +302,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
 
     let header = quote! {
         use bitvec::prelude::*;
-        use crate::types::*;
+        use super::super::types::*;
     };
     writeln!(message_file, "{}", header).unwrap();
 

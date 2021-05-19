@@ -5,13 +5,17 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 struct Opts {
     #[structopt(long)]
+    /// Path to the CanBoat project pgns.xml, or derivative of
     pub pgns_xml: String,
     #[structopt(short = "p", long = "pgn")]
+    /// List of PGNs to generate decoders for
     pub pgns: Vec<u32>,
     #[structopt(short, long)]
+    /// Path to the output directory of the crate or module
     pub output: PathBuf,
     #[structopt(short, long)]
-    pub crate_name: String,
+    /// Whether to output a complete crate, and if so, the name of it. Will generate a module otherwise.
+    pub crate_name: Option<String>,
 }
 
 pub fn main() {
@@ -22,7 +26,7 @@ pub fn main() {
         pgns_xml: opts.pgns_xml,
         pgns: opts.pgns.iter().cloned().collect(),
         output: opts.output,
-        generate_crate: Some(opts.crate_name),
+        generate_crate: opts.crate_name,
     };
 
     n2k_codegen::codegen(args);
