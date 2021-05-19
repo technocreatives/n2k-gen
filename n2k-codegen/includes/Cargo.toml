@@ -7,5 +7,5 @@ edition = "2018"
 
 [dependencies]
 log = {{ version="0.4", default-features= false }}
-bitvec = "0.22.3"
+bitvec = {{ version = "0.22.3", default-features = false }}
 n2k = {{ path = "../n2k" }}
