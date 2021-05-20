@@ -563,6 +563,20 @@ fn codegen_get_impl(
                 }
             }
         }
+    } else if !field.is_float() {
+        let raw_type = field.rust_raw_type();
+        // integer, almost the raw value, but handle unavailable values
+        quote! {
+            pub fn #field_name(&self) -> Option<#raw_type> {
+                let raw_value = self.#field_name_raw();
+                // Value is unavailable
+                if raw_value == #raw_type::MAX {
+                    None
+                } else {
+                    Some(raw_value)
+                }
+            }
+        }
     } else {
         info!(
             "unhandled non-raw field {:?} for pgn {}",
@@ -599,8 +613,6 @@ impl Field {
             "Lookup table" => lookup_table_type(&self),
             "Manufacturer code" => quote! {u16},
             "ASCII text" => quote! {&'a str},
-            "Date" => return None,
-            "Time" => return None,
             "ASCII or UNICODE string starting with length and control byte" => return None,
             "ASCII string starting with length byte" => return None,
             "String with start/stop byte" => return None,
@@ -613,8 +625,8 @@ impl Field {
             | "Pressure (hires)"
             | "Temperature (hires)" => decode_float_type_for_bit_length(self.bit_length),
             "Decimal encoded number" => decode_unsigned_int_type_for_bit_length(self.bit_length).0,
-
-            "" => {
+            // decode everything else as best effort
+            "Date" | "Time" | "" => {
                 if self.is_float() {
                     decode_float_type_for_bit_length(self.bit_length)
                 } else {
