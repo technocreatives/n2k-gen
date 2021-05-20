@@ -183,11 +183,11 @@ fn main() {
                     _,
                 )))) => {
                     if opts.show_unknown {
-                        dbg!(&result);
+                        println!("{:?}", &result);
                     }
                 }
                 r => {
-                    dbg!(&r);
+                    println!("{:?}", &r);
                 }
             };
         }

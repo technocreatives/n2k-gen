@@ -121,6 +121,7 @@ where
 
                 let mut cache = fast_packet::FastPacketCache::new(total_size);
                 let result = cache.extend(fp_index, fp_data);
+                log::info!("fast packet data {}/{}", cache.data.len(), cache.total_size);
                 if result.is_err() {
                     self.fast_packet_cache.remove(&message_id);
                 }
@@ -136,9 +137,11 @@ where
                     log::info!("fast packet data {}/{}", cache.data.len(), cache.total_size);
 
                     if result.is_err() {
+                        log::error!("failed to extend fast packet cache: {:?}", result);
                         // Error extending packet, remove cache
                         self.fast_packet_cache.remove(&message_id);
                     } else if let Some(data) = cache.complete_data() {
+                        log::info!("fast packet complete");
                         // Packet is complete
                         let message =
                             P::build_message(id.pgn(), data).map_err(BusError::PgnError)?;

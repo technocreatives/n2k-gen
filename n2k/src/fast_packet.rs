@@ -8,7 +8,7 @@ pub enum FastPacketError {
 pub type FastPacketIdentifier = (u8, u32, u8);
 pub struct FastPacketCache {
     pub data: heapless::Vec<u8, 255>,
-    pub last_frame: usize,
+    pub next_frame: Option<usize>,
     pub total_size: usize,
 }
 
@@ -16,7 +16,7 @@ impl FastPacketCache {
     pub fn new(total_size: usize) -> Self {
         Self {
             data: heapless::Vec::new(),
-            last_frame: 0,
+            next_frame: None,
             total_size,
         }
     }
@@ -34,23 +34,17 @@ impl FastPacketCache {
     }
 
     pub fn extend(&mut self, frame_index: usize, data: &[u8]) -> Result<bool, FastPacketError> {
-        if frame_index != self.last_frame + 1 {
+        if self.next_frame.is_some() && frame_index != self.next_frame.unwrap() {
             return Err(FastPacketError::UnexpectedFrameIndex {
                 index: frame_index,
-                expected: self.last_frame + 1,
+                expected: self.next_frame.unwrap(),
             });
         }
 
-        // let new_size = self.data.len() + data.len();
-        // if new_size > self.total_size {
-        //     return Err(FastPacketError::PacketTooBig {
-        //         expected: self.total_size,
-        //         actual: new_size,
-        //     });
-        // }
-
         self.data.extend_from_slice(data).unwrap();
-        self.last_frame += 1;
+
+        // Increment frame counter
+        self.next_frame = Some(frame_index + 1);
 
         Ok(self.is_complete())
     }
