@@ -10,6 +10,10 @@ Code generator for PGN parsers from completed N2K messages.
 
 Built to transparently handle multi-part n2k messages on top of a CAN bus abstracted by embedded_hal_can. Interfaces with the generated code by the code generator through the `PgnRegistry` trait.
 
+## n2k-test
+
+Parse candump and print decoded messages on the command line.
+
 ## TODO
 - [x] Interface to identify fast packets and assemble
 - [ ] Sending

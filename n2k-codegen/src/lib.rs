@@ -26,6 +26,10 @@ pub struct N2kCodeGenOpts {
 }
 
 pub fn codegen(opts: N2kCodeGenOpts) {
+    // Preserve a consistent order when generating code
+    let mut pgns_to_generate: Vec<_> = opts.pgns.iter().cloned().collect();
+    pgns_to_generate.sort_unstable();
+
     let dest_path = if opts.generate_crate.is_some() {
         opts.output.join("src")
     } else {
@@ -76,14 +80,14 @@ pub fn codegen(opts: N2kCodeGenOpts) {
     // PGN enum with variants
     writeln!(lib_file, "mod pgn;").unwrap();
     writeln!(lib_file, "pub use pgn::Pgn;").unwrap();
-    let pgns_file = codegen_pgns_variant_enum(&content, &opts.pgns);
+    let pgns_file = codegen_pgns_variant_enum(&content, &pgns_to_generate);
     let pgns_file_path = dest_path.join("pgn.rs");
     std::fs::write(pgns_file_path, pgns_file.to_string()).unwrap();
 
     // PGN registry implementation
     writeln!(lib_file, "mod registry;").unwrap();
     writeln!(lib_file, "pub use registry::PgnRegistry;").unwrap();
-    let pgns_file = codegen_pgns_registry_impl(&content, &opts.pgns);
+    let pgns_file = codegen_pgns_registry_impl(&content, &pgns_to_generate);
     let pgns_file_path = dest_path.join("registry.rs");
     std::fs::write(pgns_file_path, pgns_file.to_string()).unwrap();
 
@@ -118,7 +122,7 @@ pub fn codegen(opts: N2kCodeGenOpts) {
 }
 
 /// Generate an implementation of the PgnRegistry trait to be used by the n2k embedded_hal_can library
-fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> TokenStream {
+fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStream {
     let mut is_fast_packet = vec![];
 
     for pgn_id in pgns {
@@ -176,7 +180,7 @@ fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> Toke
 }
 
 /// Generate a PGN enum with all recognised PGN structures
-fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &HashSet<u32>) -> TokenStream {
+fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStream {
     let mut variants = vec![];
     let mut match_arms = vec![];
     for pgn_id in pgns {
