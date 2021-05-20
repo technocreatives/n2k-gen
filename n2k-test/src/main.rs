@@ -1,11 +1,7 @@
-use embedded_hal_can::{Filter, Frame};
+use embedded_hal_can::Filter;
 use log::*;
 use n2k::BusError;
-use n2k_messages::Pgns;
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-};
+use std::convert::{TryFrom, TryInto};
 use structopt::StructOpt;
 
 pub struct CanFrame {
@@ -167,29 +163,27 @@ struct Opts {
 fn main() {
     env_logger::init();
     let opts = Opts::from_args();
-    //Some([127237].iter().cloned().collect())
     let receiver = match opts.format {
         DumpFormat::CanDump => CanDumpReceiver::from_candump_file(&opts.dump_file),
         DumpFormat::N2kDump => CanDumpReceiver::from_n2kdump(&opts.dump_file),
     };
-    // let receiver = CanDumpReceiver::from_n2kdump(&opts.dump_file);
     let mut bus: n2k::Bus<_, n2k_messages::PgnRegistry> = n2k::Bus::new(receiver);
 
     loop {
         let result = bus.receive();
-        if !matches!(result, Ok(None)) {
-            match result {
-                Err(nb::Error::Other(BusError::PgnError(n2k_messages::N2kError::UnknownPgn(
-                    _,
-                )))) => {
-                    if opts.show_unknown {
-                        println!("{:?}", &result);
-                    }
+        match result {
+            Err(nb::Error::WouldBlock) => {
+                println!("done");
+                break;
+            }
+            Err(nb::Error::Other(BusError::PgnError(n2k_messages::N2kError::UnknownPgn(_)))) => {
+                if opts.show_unknown {
+                    println!("{:?}", &result);
                 }
-                r => {
-                    println!("{:?}", &r);
-                }
-            };
-        }
+            }
+            r => {
+                println!("{:?}", &r);
+            }
+        };
     }
 }

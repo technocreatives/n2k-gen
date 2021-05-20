@@ -86,7 +86,7 @@ where
         // Consume at most one frame without blocking, propagate errors
         let frame = match self.can.receive() {
             Ok(frame) => frame,
-            Err(nb::Error::WouldBlock) => return Ok(None),
+            Err(nb::Error::WouldBlock) => return Err(nb::Error::WouldBlock),
             Err(nb::Error::Other(e)) => return Err(nb::Error::Other(BusError::CanError(e))),
         };
 
