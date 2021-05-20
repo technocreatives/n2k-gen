@@ -64,6 +64,7 @@ pub fn codegen(opts: N2kCodeGenOpts) {
     let mut lib_file = File::create(&lib_path).unwrap();
     writeln!(lib_file, "mod messages;").unwrap();
     writeln!(lib_file, "mod types;").unwrap();
+    writeln!(lib_file, "pub use types::*;").unwrap();
 
     // PGNs enum with all PGNs
     writeln!(lib_file, "mod pgns;").unwrap();
@@ -503,7 +504,7 @@ fn codegen_raw_get_impl(field: &Field, field_name: &Ident) -> TokenStream {
             quote! {
                 #comments
                 pub fn #field_name(&self) -> #signed_type {
-                    let value = #bits.load_be::<#rust_type_raw>();
+                    let value = #bits.load_le::<#rust_type_raw>();
                     #signed_type::from_ne_bytes(value.to_ne_bytes())
                 }
             }
@@ -511,7 +512,7 @@ fn codegen_raw_get_impl(field: &Field, field_name: &Ident) -> TokenStream {
             quote! {
                 #comments
                 pub fn #field_name(&self) -> #rust_type_raw {
-                    #bits.load_be::<#rust_type_raw>()
+                    #bits.load_le::<#rust_type_raw>()
                 }
             }
         }
@@ -549,10 +550,17 @@ fn codegen_get_impl(
         }
     } else if field.is_float() {
         let resolution = TokenStream::from_str(&field.resolution.to_string()).unwrap();
+        let raw_type = field.rust_raw_type();
         // float
         quote! {
-            pub fn #field_name(&self) -> #rust_type {
-                (self.#field_name_raw() as #rust_type) * (#resolution as #rust_type)
+            pub fn #field_name(&self) -> Option<#rust_type> {
+                let raw_value = self.#field_name_raw();
+                // Value is unavailable
+                if raw_value == #raw_type::MAX {
+                    None
+                } else {
+                    Some((raw_value as #rust_type) * (#resolution as #rust_type))
+                }
             }
         }
     } else {
@@ -577,6 +585,14 @@ impl Field {
         !self.enum_values.enum_values.is_empty()
     }
 
+    pub fn rust_raw_type(&self) -> TokenStream {
+        if self.signed {
+            decode_signed_int_type_for_bit_length(self.bit_length)
+        } else {
+            decode_unsigned_int_type_for_bit_length(self.bit_length).0
+        }
+    }
+
     pub fn to_rust_type(&self) -> Option<TokenStream> {
         Some(match self.n2k_type.as_str() {
             "Binary data" => decode_unsigned_int_type_for_bit_length(self.bit_length).0,
@@ -590,6 +606,7 @@ impl Field {
             "String with start/stop byte" => return None,
             "Bitfield" => return None,
             "Latitude"
+            | "Pressure"
             | "IEEE Float"
             | "Longitude"
             | "Temperature"
