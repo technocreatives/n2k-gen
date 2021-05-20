@@ -3,20 +3,6 @@
 NMEA 2000 `no_std` library implemented as an embedded-hal CAN driver.
 
 Based on https://github.com/sevenseas-io/n2k
-
-## TODO
-- [x] Interface to identify fast packets and assemble
-- [ ] Sending
-  - [ ] Single frames
-  - [ ] Fast packets
-  - [x] ISO Transport Protocol multi-part messages
-- [ ] ISO functions
-  - [ ] Address claim
-  - [ ] Product Information
-  - [ ] Device Information
-  - [ ] Transmit Messages
-- [ ] Example test project
-
 ## Sources for the NMEA2000 format
 - https://gpsd.gitlab.io/gpsd/NMEA.html
 - Several parsed/reverse engineered PGNs and example traces https://github.com/canboat/canboat

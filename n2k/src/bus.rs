@@ -82,6 +82,81 @@ where
     T: Receiver<Frame = F, Error = E>,
     P: PgnRegistry,
 {
+    fn handle_fast_packet(
+        &mut self,
+        id: Id,
+        data: &[u8],
+    ) -> Result<Option<P::Message>, E, P::Error> {
+        // Good explanation of the fast packet bit format:
+        // https://forums.ni.com/t5/LabVIEW/How-do-I-read-the-larger-than-8-byte-messages-from-a-NMEA-2000/td-p/3132045?profile.language=en
+
+        let fp_seq_nr = data[0] & 0xE0;
+        let fp_index = (data[0] & 0x1F) as usize;
+
+        log::info!("received fast packet PGN {}, index {}", id.pgn(), fp_index);
+        // Identifier for the particular fast packet
+        let message_id = (id.source(), id.pgn(), fp_seq_nr);
+
+        // First fast packet frame, initialize cache
+        if fp_index == 0 {
+            let fp_data = &data[2..];
+            let total_size = data[1] as usize;
+            log::info!("total size {}", total_size);
+
+            let mut cache = fast_packet::FastPacketCache::new(total_size);
+            let result = cache.extend(fp_index, fp_data);
+            log::info!("fast packet data {}/{}", cache.data.len(), cache.total_size);
+            if result.is_err() {
+                self.fast_packet_cache.remove(&message_id);
+            }
+            // Attempt to create a new cache item for the fast packet
+            if self.fast_packet_cache.insert(message_id, cache).is_err() {
+                // Out of memory, delete one key and try again
+                let first_key = self.fast_packet_cache.keys().next().cloned();
+                if let Some(first_key) = first_key {
+                    self.fast_packet_cache.remove(&first_key);
+                    return self.handle_fast_packet(id, fp_data);
+                } else {
+                    return Err(BusError::OutOfFastPacketMemory);
+                }
+            }
+            log::info!("fast packet initialized as {:?}", message_id);
+        } else {
+            // Subsequent packet
+            let fp_data = &data[1..];
+            if let Some(cache) = self.fast_packet_cache.get_mut(&message_id) {
+                let result = cache.extend(fp_index, fp_data);
+                log::info!("fast packet data {}/{}", cache.data.len(), cache.total_size);
+
+                if result.is_err() {
+                    log::error!("failed to extend fast packet cache: {:?}", result);
+                    // Error extending packet, remove cache
+                    self.fast_packet_cache.remove(&message_id);
+                }
+            } else {
+                log::error!(
+                    "received invalid frame index {} for unknown fast packet {:?}",
+                    fp_index,
+                    message_id
+                );
+            }
+        }
+
+        // Check if the fast packet is complete
+        if let Some(cache) = self.fast_packet_cache.get_mut(&message_id) {
+            if let Some(data) = cache.complete_data() {
+                log::info!("fast packet complete");
+                // Packet is complete
+                let message = P::build_message(id.pgn(), data).map_err(BusError::PgnError)?;
+                self.fast_packet_cache.remove(&message_id);
+                return Ok(Some(message));
+            }
+        }
+
+        // Nothing complete yet
+        Ok(None)
+    }
+
     pub fn receive(&mut self) -> nb::Result<Option<P::Message>, BusError<E, P::Error>> {
         // Consume at most one frame without blocking, propagate errors
         let frame = match self.can.receive() {
@@ -103,62 +178,7 @@ where
         };
         // Is fast packet?
         if P::is_fast_packet(id.pgn()) {
-            // Good explanation of the fast packet bit format:
-            // https://forums.ni.com/t5/LabVIEW/How-do-I-read-the-larger-than-8-byte-messages-from-a-NMEA-2000/td-p/3132045?profile.language=en
-
-            let fp_seq_nr = data[0] & 0xE0;
-            let fp_index = (data[0] & 0x1F) as usize;
-
-            log::info!("received fast packet PGN {}, index {}", id.pgn(), fp_index);
-            // Identifier for the particular fast packet
-            let message_id = (id.source(), id.pgn(), fp_seq_nr);
-
-            // First fast packet frame, initialize cache
-            if fp_index == 0 {
-                let fp_data = &data[2..];
-                let total_size = data[1] as usize;
-                log::info!("total size {}", total_size);
-
-                let mut cache = fast_packet::FastPacketCache::new(total_size);
-                let result = cache.extend(fp_index, fp_data);
-                log::info!("fast packet data {}/{}", cache.data.len(), cache.total_size);
-                if result.is_err() {
-                    self.fast_packet_cache.remove(&message_id);
-                }
-                self.fast_packet_cache
-                    .insert(message_id, cache)
-                    .map_err(|_| BusError::OutOfFastPacketMemory)?;
-                log::info!("fast packet initialized as {:?}", message_id);
-            } else {
-                // Subsequent packet
-                let fp_data = &data[1..];
-                if let Some(cache) = self.fast_packet_cache.get_mut(&message_id) {
-                    let result = cache.extend(fp_index, fp_data);
-                    log::info!("fast packet data {}/{}", cache.data.len(), cache.total_size);
-
-                    if result.is_err() {
-                        log::error!("failed to extend fast packet cache: {:?}", result);
-                        // Error extending packet, remove cache
-                        self.fast_packet_cache.remove(&message_id);
-                    } else if let Some(data) = cache.complete_data() {
-                        log::info!("fast packet complete");
-                        // Packet is complete
-                        let message =
-                            P::build_message(id.pgn(), data).map_err(BusError::PgnError)?;
-                        self.fast_packet_cache.remove(&message_id);
-                        return Ok(Some(message));
-                    }
-                } else {
-                    log::error!(
-                        "received invalid frame index {} for unknown fast packet {:?}",
-                        fp_index,
-                        message_id
-                    );
-                }
-            }
-
-            // Nothing complete yet
-            Ok(None)
+            Ok(self.handle_fast_packet(id, data)?)
         } else {
             // Simple single-frame message
             let message = P::build_message(id.pgn(), data).map_err(BusError::PgnError)?;
