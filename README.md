@@ -29,3 +29,6 @@ Built to transparently handle multi-part n2k messages on top of a CAN bus abstra
 These PGNs currently don't generate properly for reasons:
 - 129540 / gnssSatsInView: variable length
 - 130820 / Fusion: proprietary PGN
+- 130311 / environmentalParameters: duplicate id name
+- 129029 / gnssPositionData: slices
+- 65288 / seatalkAlarm: duplicate enum names
