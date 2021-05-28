@@ -260,24 +260,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "n2k-messages"
-version = "0.1.0"
-dependencies = [
- "bitvec",
- "log",
- "n2k",
-]
-
-[[package]]
 name = "n2k-test"
 version = "0.1.0"
 dependencies = [
+ "bitvec",
  "canutils",
  "embedded-hal-can",
  "env_logger",
  "log",
  "n2k",
- "n2k-messages",
  "nb 1.0.0",
  "structopt",
 ]

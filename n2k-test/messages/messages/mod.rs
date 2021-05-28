@@ -1,0 +1,17 @@
+pub mod actual_pressure;
+pub mod attitude;
+pub mod charger_configuration_status;
+pub mod dc_detailed_status;
+pub mod fluid_level;
+pub mod heading_track_control;
+pub mod iso_address_claim;
+pub mod iso_request;
+pub mod position_rapid_update;
+pub mod product_information;
+pub mod rate_of_turn;
+pub mod rudder;
+pub mod seatalk_pilot_heading;
+pub mod temperature;
+pub mod temperature_extended_range;
+pub mod vessel_heading;
+pub mod wind_data;

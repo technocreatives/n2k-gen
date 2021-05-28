@@ -4,6 +4,8 @@ use n2k::BusError;
 use std::convert::{TryFrom, TryInto};
 use structopt::StructOpt;
 
+mod messages;
+
 pub struct CanFrame {
     pub frame_id: u32,
     pub frame_body: [u8; 8],
@@ -167,7 +169,7 @@ fn main() {
         DumpFormat::CanDump => CanDumpReceiver::from_candump_file(&opts.dump_file),
         DumpFormat::N2kDump => CanDumpReceiver::from_n2kdump(&opts.dump_file),
     };
-    let mut bus: n2k::Bus<_, n2k_messages::PgnRegistry> = n2k::Bus::new(receiver);
+    let mut bus: n2k::Bus<_, messages::PgnRegistry> = n2k::Bus::new(receiver);
 
     loop {
         let result = bus.receive();
@@ -176,7 +178,7 @@ fn main() {
                 println!("done");
                 break;
             }
-            Err(nb::Error::Other(BusError::PgnError(n2k_messages::N2kError::UnknownPgn(_)))) => {
+            Err(nb::Error::Other(BusError::PgnError(messages::N2kError::UnknownPgn(_)))) => {
                 if opts.show_unknown {
                     println!("{:?}", &result);
                 }

@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-n2k-messages = { path = "../n2k-messages" }
 n2k = { path = "../n2k" }
 structopt = "0.3.21"
 canutils = "1.0.0"
@@ -12,3 +11,4 @@ embedded-hal-can = "0.1.0"
 nb = "1.0.0"
 env_logger = "0.8.3"
 log = "0.4.14"
+bitvec = { version = "0.22.3" }
