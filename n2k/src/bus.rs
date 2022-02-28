@@ -72,6 +72,10 @@ impl<T, P> Bus<T, P> {
             _pgn_registry: PhantomData,
         }
     }
+
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.can
+    }
 }
 
 impl<T, E, I, F, P> Bus<T, P>
