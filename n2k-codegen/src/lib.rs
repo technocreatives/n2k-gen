@@ -553,7 +553,12 @@ fn codegen_get_impl(
             }
         }
     } else if field.is_float() {
-        let resolution = TokenStream::from_str(&field.resolution.to_string()).unwrap();
+        let resolution = if let Some(t) = rust_type.clone() {
+            format!("{}_{}", field.resolution, t)
+        } else {
+            field.resolution.to_string()
+        };
+        let resolution = TokenStream::from_str(&resolution).unwrap();
         let raw_type = field.rust_raw_type();
         // float
         quote! {
@@ -563,7 +568,7 @@ fn codegen_get_impl(
                 if raw_value == #raw_type::MAX {
                     None
                 } else {
-                    Some((raw_value as #rust_type) * (#resolution as #rust_type))
+                    Some((raw_value as #rust_type) * #resolution)
                 }
             }
         }
