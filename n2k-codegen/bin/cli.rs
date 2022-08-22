@@ -1,5 +1,5 @@
 use n2k_codegen::N2kCodeGenOpts;
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

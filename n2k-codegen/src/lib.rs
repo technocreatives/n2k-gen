@@ -6,7 +6,7 @@ use log::*;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     path::Path,
 };
 use std::{fs::File, str::FromStr};
@@ -19,7 +19,7 @@ use canboatxml::*;
 
 pub struct N2kCodeGenOpts {
     pub pgns_xml: String,
-    pub pgns: HashSet<u32>,
+    pub pgns: BTreeSet<u32>,
     pub output: PathBuf,
     /// Whether to generate a crate, and its name. Generates a module otherwise
     pub generate_crate: Option<String>,
@@ -28,7 +28,7 @@ pub struct N2kCodeGenOpts {
 pub fn codegen(opts: N2kCodeGenOpts) {
     // Preserve a consistent order when generating code
     let mut pgns_to_generate: Vec<_> = opts.pgns.iter().cloned().collect();
-    pgns_to_generate.sort_unstable();
+    pgns_to_generate.sort();
 
     let dest_path = if opts.generate_crate.is_some() {
         opts.output.join("src")
@@ -237,8 +237,8 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStre
 fn codegen_pgns_enum(pgns: &PgnsFile) -> TokenStream {
     let mut enum_fields = vec![];
     let mut enum_match_arms = vec![];
-    let mut names_seen = HashSet::new();
-    let pgn_ids: HashSet<_> = pgns.pgns.pgn_infos.iter().map(|v| v.pgn).collect();
+    let mut names_seen = BTreeSet::new();
+    let pgn_ids: BTreeSet<_> = pgns.pgns.pgn_infos.iter().map(|v| v.pgn).collect();
 
     for pgn_id in &pgn_ids {
         let names: Vec<_> = pgns
@@ -444,7 +444,7 @@ fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<String>) {
     let mut getters = vec![];
     let mut generated_fields = vec![];
 
-    let mut seen_fields: HashMap<String, u32> = HashMap::new();
+    let mut seen_fields: BTreeMap<String, u32> = BTreeMap::new();
     for field in &pgninfo.fields.fields {
         if field.id == "reserved" {
             continue;
