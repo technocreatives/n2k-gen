@@ -6,7 +6,7 @@ use log::*;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     path::Path,
 };
 use std::{fs::File, str::FromStr};
@@ -19,7 +19,7 @@ use canboatxml::*;
 
 pub struct N2kCodeGenOpts {
     pub pgns_xml: String,
-    pub pgns: HashSet<u32>,
+    pub pgns: BTreeSet<u32>,
     pub output: PathBuf,
     /// Whether to generate a crate, and its name. Generates a module otherwise
     pub generate_crate: Option<String>,
@@ -28,7 +28,7 @@ pub struct N2kCodeGenOpts {
 pub fn codegen(opts: N2kCodeGenOpts) {
     // Preserve a consistent order when generating code
     let mut pgns_to_generate: Vec<_> = opts.pgns.iter().cloned().collect();
-    pgns_to_generate.sort_unstable();
+    pgns_to_generate.sort();
 
     let dest_path = if opts.generate_crate.is_some() {
         opts.output.join("src")
@@ -185,32 +185,32 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStre
     let mut match_arms = vec![];
     for pgn_id in pgns {
         // A PGN can map to multiple variants
-        let names: Vec<_> = pgns_file
+        let infos: Vec<_> = pgns_file
             .pgns
             .pgn_infos
             .iter()
             .filter(|pgn| pgn.pgn == *pgn_id)
-            .map(|v| type_name(&v.id))
             .collect();
 
-        if names.is_empty() {
+        if infos.is_empty() {
             continue;
         }
 
-        if names.len() > 1 {
-            panic!(
-                "PGNs with more than one variation not supported yet ({})",
-                pgn_id
-            )
-        }
+        assert!(
+            infos.len() == 1,
+            "PGNs with more than one variation not supported yet ({})",
+            pgn_id
+        );
 
-        let variant_name = Ident::new(&names[0], Span::call_site());
+        let module_name = Ident::new(&infos[0].id.to_snake_case(), Span::call_site());
+        let variant_name = Ident::new(&type_name(&infos[0].id), Span::call_site());
+
         variants.push(quote! {
-            #variant_name(super::#variant_name)
+            #variant_name(super::#module_name::#variant_name)
         });
 
         match_arms.push(quote! {
-            #pgn_id => Pgn::#variant_name(super::#variant_name::try_from(bytes)?)
+            #pgn_id => Pgn::#variant_name(super::#module_name::#variant_name::try_from(bytes)?)
         });
     }
     quote! {
@@ -237,8 +237,8 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStre
 fn codegen_pgns_enum(pgns: &PgnsFile) -> TokenStream {
     let mut enum_fields = vec![];
     let mut enum_match_arms = vec![];
-    let mut names_seen = HashSet::new();
-    let pgn_ids: HashSet<_> = pgns.pgns.pgn_infos.iter().map(|v| v.pgn).collect();
+    let mut names_seen = BTreeSet::new();
+    let pgn_ids: BTreeSet<_> = pgns.pgns.pgn_infos.iter().map(|v| v.pgn).collect();
 
     for pgn_id in &pgn_ids {
         let names: Vec<_> = pgns
@@ -297,12 +297,24 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
     info!("generating PGN {} / {}", pgninfo.pgn, pgninfo.id);
 
     writeln!(gen_lib_file, "pub mod {};", module_name).unwrap();
+
+    writeln!(lib_file, "pub mod {module_name} {{").unwrap();
     writeln!(
         lib_file,
-        "pub use messages::{}::{};",
-        module_name, struct_name
+        "pub use super::messages::{module_name}::{struct_name};"
     )
     .unwrap();
+    for field in &pgninfo.fields.fields {
+        if field.is_enum() {
+            let enum_name = lookup_table_type(&field);
+            writeln!(
+                lib_file,
+                "pub use super::messages::{module_name}::{enum_name};"
+            )
+            .unwrap();
+        }
+    }
+    writeln!(lib_file, "}}").unwrap();
 
     let name = format!("messages/{}.rs", &module_name);
     let current_file_path = path.join(&name);
@@ -444,7 +456,7 @@ fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<String>) {
     let mut getters = vec![];
     let mut generated_fields = vec![];
 
-    let mut seen_fields: HashMap<String, u32> = HashMap::new();
+    let mut seen_fields: BTreeMap<String, u32> = BTreeMap::new();
     for field in &pgninfo.fields.fields {
         if field.id == "reserved" {
             continue;
@@ -553,7 +565,12 @@ fn codegen_get_impl(
             }
         }
     } else if field.is_float() {
-        let resolution = TokenStream::from_str(&field.resolution.to_string()).unwrap();
+        let resolution = if let Some(t) = rust_type.clone() {
+            format!("{}_{}", field.resolution, t)
+        } else {
+            field.resolution.to_string()
+        };
+        let resolution = TokenStream::from_str(&resolution).unwrap();
         let raw_type = field.rust_raw_type();
         // float
         quote! {
@@ -563,7 +580,7 @@ fn codegen_get_impl(
                 if raw_value == #raw_type::MAX {
                     None
                 } else {
-                    Some((raw_value as #rust_type) * (#resolution as #rust_type))
+                    Some((raw_value as #rust_type) * #resolution)
                 }
             }
         }
