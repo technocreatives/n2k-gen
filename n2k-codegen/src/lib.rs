@@ -185,32 +185,32 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStre
     let mut match_arms = vec![];
     for pgn_id in pgns {
         // A PGN can map to multiple variants
-        let names: Vec<_> = pgns_file
+        let infos: Vec<_> = pgns_file
             .pgns
             .pgn_infos
             .iter()
             .filter(|pgn| pgn.pgn == *pgn_id)
-            .map(|v| type_name(&v.id))
             .collect();
 
-        if names.is_empty() {
+        if infos.is_empty() {
             continue;
         }
 
-        if names.len() > 1 {
-            panic!(
-                "PGNs with more than one variation not supported yet ({})",
-                pgn_id
-            )
-        }
+        assert!(
+            infos.len() == 1,
+            "PGNs with more than one variation not supported yet ({})",
+            pgn_id
+        );
 
-        let variant_name = Ident::new(&names[0], Span::call_site());
+        let module_name = Ident::new(&infos[0].id.to_snake_case(), Span::call_site());
+        let variant_name = Ident::new(&type_name(&infos[0].id), Span::call_site());
+
         variants.push(quote! {
-            #variant_name(super::#variant_name)
+            #variant_name(super::#module_name::#variant_name)
         });
 
         match_arms.push(quote! {
-            #pgn_id => Pgn::#variant_name(super::#variant_name::try_from(bytes)?)
+            #pgn_id => Pgn::#variant_name(super::#module_name::#variant_name::try_from(bytes)?)
         });
     }
     quote! {
@@ -297,12 +297,24 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
     info!("generating PGN {} / {}", pgninfo.pgn, pgninfo.id);
 
     writeln!(gen_lib_file, "pub mod {};", module_name).unwrap();
+
+    writeln!(lib_file, "pub mod {module_name} {{").unwrap();
     writeln!(
         lib_file,
-        "pub use messages::{}::{};",
-        module_name, struct_name
+        "pub use super::messages::{module_name}::{struct_name};"
     )
     .unwrap();
+    for field in &pgninfo.fields.fields {
+        if field.is_enum() {
+            let enum_name = lookup_table_type(&field);
+            writeln!(
+                lib_file,
+                "pub use super::messages::{module_name}::{enum_name};"
+            )
+            .unwrap();
+        }
+    }
+    writeln!(lib_file, "}}").unwrap();
 
     let name = format!("messages/{}.rs", &module_name);
     let current_file_path = path.join(&name);
