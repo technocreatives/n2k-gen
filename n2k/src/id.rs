@@ -1,7 +1,7 @@
 use crate::GLOBAL_ADDRESS;
 use core::convert::TryFrom;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IdError {
     CanNotSendToDestination,
     DestinationRequired,
@@ -12,7 +12,7 @@ pub enum IdError {
 pub type Result<T> = core::result::Result<T, IdError>;
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Priority {
     Priority0 = 0,
     Priority1 = 1,

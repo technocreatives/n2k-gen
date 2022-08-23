@@ -309,7 +309,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
     .unwrap();
     for field in &pgninfo.fields.fields {
         if field.is_enum() {
-            let enum_name = lookup_table_type(&field);
+            let enum_name = lookup_table_type(field);
             writeln!(
                 lib_file,
                 "pub use super::messages::{module_name}::{enum_name};"
@@ -362,12 +362,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
     // Codegen enums that are part of this PGN
     for field in &pgninfo.fields.fields {
         if !field.enum_values.enum_values.is_empty() {
-            writeln!(
-                message_file,
-                "{}",
-                codegen_enum(&pgninfo, &field, &field.enum_values)
-            )
-            .unwrap();
+            writeln!(message_file, "{}", codegen_enum(field, &field.enum_values)).unwrap();
         }
     }
 
@@ -376,9 +371,9 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
 }
 
 /// Generate an enum for a lookup table type field
-fn codegen_enum(pgninfo: &PgnInfo, field: &Field, values: &EnumValues) -> TokenStream {
+fn codegen_enum(field: &Field, values: &EnumValues) -> TokenStream {
     let enum_int_type = decode_unsigned_int_type_for_bit_length(field.bit_length).0;
-    let enum_type_name = lookup_table_type(&field);
+    let enum_type_name = lookup_table_type(field);
     let mut enum_fields = vec![];
     let mut enum_match_arms = vec![];
     // Amazingly, the pgns.xml encodes some enum values as binary, others as decimal.
@@ -491,7 +486,7 @@ fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<Ident>) {
 
         getters.push(codegen_raw_get_impl(field, &field_name_raw));
         // If a non-raw getter is available, use that as the main interpretation of it
-        if let Some(get) = codegen_get_impl(&pgninfo, field, &field_name_raw, &field_name) {
+        if let Some(get) = codegen_get_impl(pgninfo, field, &field_name_raw, &field_name) {
             generated_fields.push(field_name);
             getters.push(get);
         } else {
@@ -645,7 +640,7 @@ impl Field {
     pub fn to_rust_type(&self) -> Option<TokenStream> {
         Some(match self.n2k_type.as_str() {
             "Binary data" => decode_unsigned_int_type_for_bit_length(self.bit_length).0,
-            "Lookup table" => lookup_table_type(&self),
+            "Lookup table" => lookup_table_type(self),
             "Manufacturer code" => quote! {u16},
             "ASCII text" => quote! {&'a str},
             "ASCII or UNICODE string starting with length and control byte" => return None,

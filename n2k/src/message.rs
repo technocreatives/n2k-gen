@@ -1,6 +1,6 @@
 use crate::Id;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MessageError {
     Max255Bytes,
 }
@@ -26,6 +26,6 @@ impl<'a> Message<'a> {
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.data
+        self.data
     }
 }
