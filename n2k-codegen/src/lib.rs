@@ -331,7 +331,6 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
 
     let size = pgninfo.length;
     let struct_ = quote! {
-        #[derive(defmt::Format)]
         pub struct #struct_name {
             raw: [u8; #size],
         }
@@ -432,15 +431,17 @@ fn codegen_impl(pgninfo: &PgnInfo) -> TokenStream {
     let struct_name = Ident::new(&struct_name_str, Span::call_site());
     let (getters, fields) = codegen_getters(pgninfo);
 
-    let field_debugs: Vec<_> = fields
-        .iter()
-        .map(|v| {
-            let ident = Ident::new(&v, Span::call_site());
-            quote! {
-                .field(#v, &self.#ident())
-            }
-        })
-        .collect();
+    let mut defmt_fmt_str = struct_name_str.clone();
+    if !fields.is_empty() {
+        defmt_fmt_str += " {{ ";
+        defmt_fmt_str += &fields
+            .iter()
+            .map(|v| v.to_string() + ": {}")
+            .collect::<Vec<_>>()
+            .join(", ");
+        defmt_fmt_str += " }}";
+    }
+
     quote! {
         impl #struct_name {
             #getters
@@ -449,15 +450,23 @@ fn codegen_impl(pgninfo: &PgnInfo) -> TokenStream {
         impl core::fmt::Debug for #struct_name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 f.debug_struct(#struct_name_str)
-                #(#field_debugs)*
-                .finish()
+                    #(
+                        .field(core::stringify!(#fields), &self.#fields())
+                    )*
+                    .finish()
+            }
+        }
+
+        impl defmt::Format for #struct_name {
+            fn format(&self, f: defmt::Formatter<'_>) {
+                defmt::write!(f, #defmt_fmt_str, #(&self.#fields()),*)
             }
         }
     }
 }
 
 /// Generate raw and interpreted getters for a PGN
-fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<String>) {
+fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<Ident>) {
     let mut getters = vec![];
     let mut generated_fields = vec![];
 
@@ -483,10 +492,10 @@ fn codegen_getters(pgninfo: &PgnInfo) -> (TokenStream, Vec<String>) {
         getters.push(codegen_raw_get_impl(field, &field_name_raw));
         // If a non-raw getter is available, use that as the main interpretation of it
         if let Some(get) = codegen_get_impl(&pgninfo, field, &field_name_raw, &field_name) {
-            generated_fields.push(field_name.to_string());
+            generated_fields.push(field_name);
             getters.push(get);
         } else {
-            generated_fields.push(field_name_raw.to_string());
+            generated_fields.push(field_name_raw);
         }
     }
 
