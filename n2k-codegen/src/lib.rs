@@ -407,12 +407,12 @@ fn codegen_enum(pgninfo: &PgnInfo, field: &Field, values: &EnumValues) -> TokenS
 
     // TODO: impl Into<> for writing
     quote! {
-       #[derive(Debug)]
+        #[derive(Debug)]
         #[derive(defmt::Format)]
-       pub enum #enum_type_name {
-           #(#enum_fields),*,
-           Other(#enum_int_type)
-       }
+        pub enum #enum_type_name {
+            #(#enum_fields),*,
+            Other(#enum_int_type)
+        }
 
         impl core::convert::From<#enum_int_type> for #enum_type_name {
             #[inline(always)]
