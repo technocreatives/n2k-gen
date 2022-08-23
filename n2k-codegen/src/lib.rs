@@ -162,6 +162,7 @@ fn codegen_pgns_registry_impl(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStr
     };
 
     quote! {
+        #[derive(defmt::Format)]
         pub struct PgnRegistry;
         impl n2k::PgnRegistry for PgnRegistry {
             type Message = super::Pgn;
@@ -218,6 +219,7 @@ fn codegen_pgns_variant_enum(pgns_file: &PgnsFile, pgns: &Vec<u32>) -> TokenStre
         use core::convert::TryFrom;
 
         #[derive(Debug)]
+        #[derive(defmt::Format)]
         pub enum Pgn {
             #(#variants),*
         }
@@ -271,6 +273,7 @@ fn codegen_pgns_enum(pgns: &PgnsFile) -> TokenStream {
         use super::types::*;
 
         #[derive(Eq, PartialEq, Debug)]
+        #[derive(defmt::Format)]
         pub enum Pgns {
             #(#enum_fields),*
         }
@@ -328,6 +331,7 @@ fn codegen_pgn(lib_file: &mut File, gen_lib_file: &mut File, path: &Path, pgninf
 
     let size = pgninfo.length;
     let struct_ = quote! {
+        #[derive(defmt::Format)]
         pub struct #struct_name {
             raw: [u8; #size],
         }
@@ -404,6 +408,7 @@ fn codegen_enum(pgninfo: &PgnInfo, field: &Field, values: &EnumValues) -> TokenS
     // TODO: impl Into<> for writing
     quote! {
        #[derive(Debug)]
+        #[derive(defmt::Format)]
        pub enum #enum_type_name {
            #(#enum_fields),*,
            Other(#enum_int_type)
