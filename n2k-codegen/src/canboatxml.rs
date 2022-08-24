@@ -54,16 +54,10 @@ pub struct PgnInfo {
     pub fields: Fields,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Fields {
     #[serde(rename = "Field", default)]
     pub fields: Vec<Field>,
-}
-
-impl std::default::Default for Fields {
-    fn default() -> Fields {
-        Fields { fields: vec![] }
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -92,18 +86,10 @@ pub struct Field {
     pub description: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct EnumValues {
     #[serde(rename = "EnumPair", default)]
     pub enum_values: Vec<EnumPair>,
-}
-
-impl std::default::Default for EnumValues {
-    fn default() -> EnumValues {
-        EnumValues {
-            enum_values: vec![],
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
