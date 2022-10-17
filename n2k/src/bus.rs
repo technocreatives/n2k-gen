@@ -161,9 +161,9 @@ where
         Ok(None)
     }
 
-    pub fn receive(&mut self) -> nb::Result<Option<P::Message>, BusError<E, P::Error>> {
+    pub async fn receive(&mut self) -> nb::Result<Option<P::Message>, BusError<E, P::Error>> {
         // Consume at most one frame without blocking, propagate errors
-        let frame = match self.can.receive() {
+        let frame = match self.can.receive().await {
             Ok(frame) => frame,
             Err(nb::Error::WouldBlock) => return Err(nb::Error::WouldBlock),
             Err(nb::Error::Other(e)) => return Err(nb::Error::Other(BusError::CanError(e))),
