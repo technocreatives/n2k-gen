@@ -32,3 +32,9 @@ pub trait PgnRegistry {
     fn is_fast_packet(pgn: u32) -> bool;
     fn build_message(pgn: u32, data: &[u8]) -> Result<Self::Message, Self::Error>;
 }
+
+#[cfg(feature = "defmt")]
+pub(crate) use defmt as log;
+
+#[cfg(not(feature = "defmt"))]
+pub(crate) use log;

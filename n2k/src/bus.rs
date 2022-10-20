@@ -2,6 +2,7 @@ use core::{convert::TryFrom, fmt::Debug, marker::PhantomData};
 
 use heapless::FnvIndexMap;
 
+use crate::log;
 use crate::{
     fast_packet,
     hal_can::{self, Receiver, Transmitter},

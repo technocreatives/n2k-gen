@@ -1,4 +1,5 @@
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FastPacketError {
     UnexpectedFrameIndex { index: usize, expected: usize },
     PacketTooBig { actual: usize, expected: usize },
