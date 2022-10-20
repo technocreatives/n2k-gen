@@ -162,13 +162,15 @@ where
         Ok(None)
     }
 
-    pub async fn receive(&mut self) -> nb::Result<Option<P::Message>, BusError<E, P::Error>> {
+    pub async fn receive(
+        &mut self,
+    ) -> core::result::Result<Option<P::Message>, BusError<E, P::Error>> {
         // Consume at most one frame without blocking, propagate errors
-        let frame = match self.can.receive().await {
-            Ok(frame) => frame,
-            Err(nb::Error::WouldBlock) => return Err(nb::Error::WouldBlock),
-            Err(nb::Error::Other(e)) => return Err(nb::Error::Other(BusError::CanError(e))),
-        };
+        let frame = self
+            .can
+            .receive()
+            .await
+            .map_err(|e| BusError::CanError(e))?;
 
         // NMEA2000 only uses extended IDs
         if frame.id().extended_id().is_none() {
