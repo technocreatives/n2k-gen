@@ -77,6 +77,11 @@ impl<T, P> Bus<T, P> {
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.can
     }
+
+    /// Deconstruct the Bus and recover the CAN object
+    pub fn into_inner(self) -> T {
+        self.can
+    }
 }
 
 impl<T, E, I, F, P> Bus<T, P>
