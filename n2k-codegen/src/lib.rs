@@ -383,7 +383,7 @@ fn codegen_enum(field: &Field, values: &EnumValues) -> TokenStream {
         .iter()
         .all(|v| v.value.chars().all(|b| b == '0' || b == '1'));
     for value in &values.enum_values {
-        let variant_name = Ident::new(&type_name(&value.name), Span::call_site());
+        let variant_name = Ident::new(&type_name(&value.name.replace(".", "")), Span::call_site());
         let decoded_value = if is_binary {
             usize::from_str_radix(&value.value, 2).unwrap().to_string()
         } else {
@@ -670,6 +670,15 @@ impl Field {
                     eprintln!("resolution = {:#?}", self.resolution);
                     eprintln!("bit_length = {:#?}", self.bit_length);
                     unimplemented!()
+                }
+            }
+            "Number" => {
+                if self.is_float() {
+                    decode_float_type_for_bit_length(self.bit_length)
+                } else if self.signed {
+                    decode_signed_int_type_for_bit_length(self.bit_length)
+                } else {
+                    decode_unsigned_int_type_for_bit_length(self.bit_length).0
                 }
             }
             x => panic!("unhandled N2K type {}", x),

@@ -15,6 +15,7 @@ Built to transparently handle multi-part n2k messages on top of a CAN bus abstra
 Parse candump and print decoded messages on the command line.
 
 ## TODO
+- [ ] Variable bit length PGNs
 - [x] Interface to identify fast packets and assemble
 - [ ] Sending
   - [ ] Single frames
