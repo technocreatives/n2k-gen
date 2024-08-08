@@ -6,7 +6,7 @@ use log::*;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::Path,
 };
 use std::{fs::File, str::FromStr};
@@ -382,8 +382,21 @@ fn codegen_enum(field: &Field, values: &EnumValues) -> TokenStream {
         .enum_values
         .iter()
         .all(|v| v.value.chars().all(|b| b == '0' || b == '1'));
+
+    let mut occurrences = HashMap::new();
     for value in &values.enum_values {
-        let variant_name = Ident::new(&type_name(&value.name.replace(".", "")), Span::call_site());
+        let xml_variant_name = type_name(&value.name.replace(".", ""));
+
+        // count occurrences to avoid duplicate variant names
+        let occurs = occurrences.entry(xml_variant_name.clone()).or_insert(0);
+
+        let postfix = if *occurs > 0 { &occurs.to_string() } else { "" };
+        let variant_name = Ident::new(
+            &format!("{}{}", &xml_variant_name, postfix),
+            Span::call_site(),
+        );
+        *occurs += 1;
+
         let decoded_value = if is_binary {
             usize::from_str_radix(&value.value, 2).unwrap().to_string()
         } else {
@@ -562,8 +575,8 @@ fn codegen_get_impl(
     Some(if field.is_string() {
         // string
         quote! {
-            pub fn #field_name<'a>(&'a self) -> Result<#rust_type, core::str::Utf8Error> {
-                core::str::from_utf8(self.#field_name_raw())
+            pub fn #field_name<'a>(&'a self) -> Option<#rust_type> {
+                core::str::from_utf8(self.#field_name_raw()).ok()
             }
         }
     } else if field.is_enum() {
