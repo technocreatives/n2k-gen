@@ -1,7 +1,12 @@
+#![feature(impl_trait_in_assoc_type)]
+
 use embedded_hal_can::Filter;
 use log::*;
 use n2k::BusError;
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    future::Future,
+};
 use structopt::StructOpt;
 
 mod messages;
@@ -117,15 +122,21 @@ impl Filter for MockFilter {
 }
 
 impl embedded_hal_can::Receiver for CanDumpReceiver {
-    fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
-        if self.ctr >= self.entries.len() {
-            return Err(nb::Error::WouldBlock);
-        }
-        let entry = &self.entries[self.ctr];
-        self.ctr += 1;
+    type ReceiverFuture<'a> = impl Future<Output = Result<n2k::CanFrame, ()>> + 'a
+    where
+        Self: 'a;
 
-        let id = n2k::Id::try_from(entry.can_frame.frame_id).unwrap();
-        Ok(n2k::CanFrame::new(id, &entry.can_frame.frame_body))
+    fn receive(&mut self) -> Self::ReceiverFuture<'_> {
+        async move {
+            if self.ctr >= self.entries.len() {
+                return Err(());
+            }
+            let entry = &self.entries[self.ctr];
+            self.ctr += 1;
+
+            let id = n2k::Id::try_from(entry.can_frame.frame_id).unwrap();
+            Ok(n2k::CanFrame::new(id, &entry.can_frame.frame_body))
+        }
     }
 
     fn set_filter(&mut self, filter: Self::Filter) {
@@ -162,7 +173,9 @@ struct Opts {
     #[structopt(short, long)]
     pub show_unknown: bool,
 }
-fn main() {
+
+#[tokio::main]
+async fn main() {
     env_logger::init();
     let opts = Opts::from_args();
     let receiver = match opts.format {
@@ -172,13 +185,13 @@ fn main() {
     let mut bus: n2k::Bus<_, messages::PgnRegistry> = n2k::Bus::new(receiver);
 
     loop {
-        let result = bus.receive();
+        let result = bus.receive().await;
         match result {
-            Err(nb::Error::WouldBlock) => {
+            Err(BusError::CanError(())) => {
                 println!("done");
                 break;
             }
-            Err(nb::Error::Other(BusError::PgnError(messages::N2kError::UnknownPgn(_)))) => {
+            Err(BusError::PgnError(messages::N2kError::UnknownPgn(_))) => {
                 if opts.show_unknown {
                     println!("{:?}", &result);
                 }
